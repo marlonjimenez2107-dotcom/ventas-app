@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Ventas</title>
+<style>
+body{font:16px system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:#f7f6f3;color:#1d1d1b}
+label{display:block;font-size:13px;color:#666;margin-top:12px}
+select,input,button{width:100%;font:inherit;padding:11px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
+button{background:#2f6f5e;color:#fff;border:0;margin-top:16px}
+button:disabled{opacity:.6}
+#msg,#lm,#prev{margin-top:12px;color:#555}
+</style></head><body>
+<div id="login"><h2>Ventas</h2><label>PIN</label><input id="pin" type="password" autocomplete="off">
+<button id="in">Entrar</button><div id="lm"></div></div>
+<div id="app" hidden><h2>Registrar venta</h2>
+<label>Producto</label><select id="prod"></select>
+<label>Cantidad</label><input id="q" type="number" min="1" value="1">
+<label>Descuento %</label><input id="d" type="number" min="0" max="100" value="0">
+<label>Método de pago</label><select id="pago"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option></select>
+<div id="prev"></div><button id="go">Registrar venta</button><div id="msg"></div></div>
+<script>
+const API="https://script.google.com/macros/s/AKfycbwdK6TfC6yw-DsW1pPRJL-AYVuL9oQzes0_euNLAkQeWXdUhCr0Yx2xxthvXKQTMmUyRQ/exec";
+const $=i=>document.getElementById(i);
+let PIN="",P=[];
+try{PIN=localStorage.getItem("pin")||""}catch(e){}
+const m=v=>"$"+Math.round(v).toLocaleString("es-CO");
+async function call(a){try{const r=await fetch(API+"?"+new URLSearchParams({...a,pin:PIN}));return await r.json()}catch(e){return{error:"No se pudo conectar con la hoja."}}}
+async function cargar(){
+  const r=await call({action:"productos"});
+  if(r.error){$("lm").textContent=r.error;$("login").hidden=false;$("app").hidden=true;return}
+  P=r.productos;$("login").hidden=true;$("app").hidden=false;
+  const s=$("prod").value;
+  $("prod").innerHTML=P.map(p=>`<option value="${p.id}">${p.n} · ${p.t} (${p.s} en stock) · ${m(p.p)}</option>`).join("");
+  if(s)$("prod").value=s;prev();
+}
+function prev(){const p=P.find(x=>x.id===$("prod").value);if(!p)return;
+  const q=Math.max(1,+$("q").value||1),d=Math.min(100,Math.max(0,+$("d").value||0));
+  $("prev").textContent="Total: "+m(p.p*q*(1-d/100));}
+["prod","q","d"].forEach(i=>$(i).oninput=prev);
+$("in").onclick=()=>{PIN=$("pin").value;try{localStorage.setItem("pin",PIN)}catch(e){}$("lm").textContent="Entrando...";cargar()};
+$("go").onclick=async()=>{
+  $("go").disabled=true;$("msg").textContent="Guardando...";
+  const r=await call({action:"vender",id:$("prod").value,q:$("q").value,d:$("d").value,pago:$("pago").value});
+  $("msg").textContent=r.error?("Error: "+r.error):("Venta registrada ✓ Total: "+m(r.total));
+  $("go").disabled=false;if(!r.error){$("q").value=1;$("d").value=0;cargar()}
+};
+if(PIN)cargar();
+</script></body></html>
